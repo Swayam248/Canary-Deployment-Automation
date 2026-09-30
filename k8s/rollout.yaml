@@ -1,0 +1,57 @@
+apiVersion: argoproj.io/v1alpha1
+kind: Rollout
+
+metadata:
+  name: canary-app
+  namespace: canary-demo
+
+spec:
+  replicas: 4
+
+  selector:
+    matchLabels:
+      app: canary-app
+
+  template:
+    metadata:
+      labels:
+        app: canary-app
+
+    spec:
+      containers:
+        - name: canary-app
+          image: canary-app:v2
+          imagePullPolicy: IfNotPresent
+
+          ports:
+            - containerPort: 8000
+
+          readinessProbe:
+            httpGet:
+              path: /health
+              port: 8000
+            initialDelaySeconds: 5
+            periodSeconds: 5
+
+          livenessProbe:
+            httpGet:
+              path: /health
+              port: 8000
+            initialDelaySeconds: 10
+            periodSeconds: 10
+
+  strategy:
+    canary:
+
+      steps:
+        - setWeight: 25
+        - pause:
+            duration: 30s
+
+        - setWeight: 50
+        - pause:
+            duration: 30s
+
+        - setWeight: 75
+        - pause:
+            duration: 30s
