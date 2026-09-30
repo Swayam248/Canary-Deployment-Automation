@@ -131,7 +131,7 @@ In PowerShell, change to your project folder. Example path used during
 the walkthrough:
 
 ``` powershell
-cd C:\Users\Arpan\OneDrive\Desktop\Canary-Dep
+cd C:\Users\Swayam\OneDrive\Desktop\Canary-Dep
 ```
 
 Create the `app` and `k8s` folders if they do not already exist.
@@ -282,8 +282,30 @@ cd ..
 
 ## 5. Prepare Kubernetes
 
-Enable Kubernetes in Docker Desktop and verify the current context and
-node:
+This project uses the Kubernetes cluster provided by Docker Desktop.
+Make sure Docker Desktop is installed and running before continuing.
+
+### Enable Kubernetes in Docker Desktop
+
+1.  Open **Docker Desktop**.
+2.  Open **Settings**.
+3.  In **General**, make sure the Docker engine is configured to use the
+    **WSL 2 based engine** if that option is available on your Windows
+    installation.
+4.  In **Kubernetes**, enable **Enable Kubernetes**.
+5.  If Docker Desktop shows additional Kubernetes options such as **Show
+    system containers**, you can enable them so that Kubernetes system
+    workloads are visible when troubleshooting.
+6.  Click **Apply & Restart** and wait until Docker Desktop shows that
+    Kubernetes is running.
+
+> **Note:** Docker Desktop's Settings layout can change between
+> versions. The important requirement for this project is that the local
+> Kubernetes cluster is enabled and running.
+
+### Verify the Kubernetes cluster
+
+Open PowerShell and run:
 
 ``` powershell
 kubectl config get-contexts
@@ -291,11 +313,25 @@ kubectl get nodes
 kubectl get pods -A
 ```
 
-The walkthrough used the `docker-desktop` context. Your context may
-differ; make sure you are targeting the intended local cluster before
-applying manifests.
+In the walkthrough, the active context was `docker-desktop` and the
+Kubernetes node was available. Your context may have a different name;
+make sure you are targeting the intended local cluster before applying
+any manifests.
 
 ## 6. Create a namespace and regular Deployment
+
+From this point onward, run the Kubernetes commands from the project
+root. In this walkthrough, the complete project directory is:
+
+``` powershell
+C:\Users\Swayam\OneDrive\Desktop\Canary-Dep
+```
+
+Go to the project root first:
+
+``` powershell
+cd C:\Users\Swayam\OneDrive\Desktop\Canary-Dep
+```
 
 Create `k8s/namespace.yaml`:
 
@@ -419,6 +455,12 @@ matching label.
 
 ## 8. Install Argo Rollouts
 
+Run these commands from the project root:
+
+``` powershell
+cd C:\Users\Swayam\OneDrive\Desktop\Canary-Dep
+```
+
 Create the controller namespace:
 
 ``` powershell
@@ -432,44 +474,75 @@ manifest:
 kubectl apply --server-side --namespace argo-rollouts --filename https://github.com/argoproj/argo-rollouts/releases/latest/download/install.yaml
 ```
 
-Verify the controller is running:
+Verify that the controller resources were created and are running:
 
 ``` powershell
-kubectl get deployments -n argo-rollouts
 kubectl get pods -n argo-rollouts
+kubectl get deployment -n argo-rollouts
 ```
 
 Argo Rollouts installs a Kubernetes controller and custom resource
 definitions. The controller watches `Rollout` resources and manages
 their ReplicaSets according to the configured deployment strategy.
 
-## 9. Install the Argo Rollouts CLI plugin on Windows
+## 9. Install the Argo Rollouts kubectl plugin on Windows
 
-The plugin adds commands such as `kubectl argo rollouts get rollout`. In
-this walkthrough, the Windows AMD64 release executable was downloaded
-from the official Argo Rollouts GitHub Releases page and saved as:
+The plugin adds commands such as `kubectl argo rollouts get rollout`.
+The walkthrough used Argo Rollouts **v1.10.0** on Windows AMD64.
 
-``` text
-%USERPROFILE%\bin\kubectl-argo-rollouts.exe
+Create the local `bin` directory if it does not already exist:
+
+``` powershell
+New-Item -ItemType Directory -Force -Path "$env:USERPROFILE\bin"
 ```
 
-Add that directory to the current PowerShell session's PATH:
+Download the plugin executable:
+
+``` powershell
+Invoke-WebRequest -Uri "https://github.com/argoproj/argo-rollouts/releases/download/v1.10.0/kubectl-argo-rollouts-windows-amd64" -OutFile "$env:USERPROFILE\bin\kubectl-argo-rollouts.exe"
+```
+
+Verify that the executable exists:
+
+``` powershell
+Get-Item "$env:USERPROFILE\bin\kubectl-argo-rollouts.exe"
+```
+
+Add the directory to the current PowerShell session's PATH:
 
 ``` powershell
 $env:Path += ";$env:USERPROFILE\bin"
+```
+
+Verify the plugin:
+
+``` powershell
 kubectl argo rollouts version
 ```
 
-If `kubectl argo rollouts` reports `unknown command "argo"`, verify that
-the executable exists and the directory is on PATH. The command above
-only changes the current PowerShell session. To use the command in a new
-terminal, add the directory to your user PATH through Windows
-Environment Variables or run the PATH command again.
-
-Download the executable only from the official Argo Rollouts release
-page: https://github.com/argoproj/argo-rollouts/releases
+If `kubectl argo rollouts` reports `unknown command "argo"`, the plugin
+is either not on PATH or the current terminal has not been updated. The
+PATH command above only changes the current PowerShell session. In a new
+terminal, add the directory to PATH again or permanently add
+`%USERPROFILE%\bin` to the Windows user PATH.
 
 ## 10. Replace the Deployment with a Rollout
+
+Before creating the Rollout, remove the standard Kubernetes Deployment
+created earlier. This is important because the normal Deployment and the
+Argo Rollout should not manage the same application workload.
+
+From the project root:
+
+``` powershell
+cd C:\Users\Swayam\OneDrive\Desktop\Canary-Dep
+kubectl delete deployment canary-app -n canary-demo
+kubectl get deployments -n canary-demo
+```
+
+The second command should show that the normal `canary-app` Deployment
+is no longer present. Keep the `canary-service`; it will continue to
+select Pods with the matching `app: canary-app` label.
 
 Create `k8s/rollout.yaml`:
 
@@ -534,7 +607,11 @@ spec:
 
 Apply and inspect:
 
+From the project root (`C:\Users\Swayam\OneDrive\Desktop\Canary-Dep`),
+apply the Rollout:
+
 ``` powershell
+cd C:\Users\Swayam\OneDrive\Desktop\Canary-Dep
 kubectl apply -f k8s\rollout.yaml
 kubectl get rollouts -n canary-demo
 kubectl argo rollouts get rollout canary-app -n canary-demo
@@ -581,7 +658,11 @@ image: canary-app:v2
 
 Apply and watch:
 
+From the project root (`C:\Users\Swayam\OneDrive\Desktop\Canary-Dep`),
+apply and watch:
+
 ``` powershell
+cd C:\Users\Swayam\OneDrive\Desktop\Canary-Dep
 kubectl apply -f k8s\rollout.yaml
 kubectl argo rollouts get rollout canary-app -n canary-demo --watch
 ```
@@ -670,7 +751,11 @@ image: canary-app:v3
 
 Apply and watch the rollout:
 
+From the project root (`C:\Users\Swayam\OneDrive\Desktop\Canary-Dep`),
+apply and watch:
+
 ``` powershell
+cd C:\Users\Swayam\OneDrive\Desktop\Canary-Dep
 kubectl apply -f k8s\rollout.yaml
 kubectl argo rollouts get rollout canary-app -n canary-demo --watch
 ```
